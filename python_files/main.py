@@ -21,8 +21,8 @@ POSITION_DICT = {
     "[<Position.POINT_GUARD: 'POINT GUARD'>]": "PG",
     "[<Position.SMALL_FORWARD: 'SMALL FORWARD'>]": "SF",
 }
-# RECIPIENTS = [json.loads(os.environ.get("RECIPIENT_EMAILS"))[0]]    # Send to ONLY ME
-RECIPIENTS = json.loads(os.environ.get("RECIPIENT_EMAILS"))         # Send to FULL LIST
+RECIPIENTS = [json.loads(os.environ.get("RECIPIENT_EMAILS"))[0]]    # Send to ONLY ME
+# RECIPIENTS = json.loads(os.environ.get("RECIPIENT_EMAILS"))         # Send to FULL LIST
 
 pd.set_option('display.max_columns', None)
 pd.set_option("display.width", 225)
@@ -56,6 +56,67 @@ def pull_schedule() -> pd.DataFrame:
     schedule_json = schedule_r.json()["scoreboard"]["games"]
     schedule_df = pd.DataFrame(schedule_json)
     return schedule_df
+
+
+def pull_player_positions() -> pd.DataFrame:
+    """Use basketball_reference_web_scraper to find all current players' position on their respective team"""
+    # # Basketball Reference call
+    br_df = pd.DataFrame(client.players_season_totals(season_end_year=2024))
+    br_df = br_df[["name", "positions", "team"]]
+
+    # Convert positions and team columns to str since they are listed as enums
+    br_df["positions"] = br_df["positions"].astype(str)
+    br_df["team"] = br_df["team"].astype(str)
+
+    # Remove accents on names to match stats.nba.com
+    br_df["name"] = br_df["name"].apply(unidecode)
+    # Use the static positions dictionary to convert to a more legible position string
+    br_df["positions"] = br_df["positions"].apply(lambda x: POSITION_DICT.get(x))
+    br_df["team"] = br_df["team"].str.split("_").apply(lambda x: x[-1]).str.lower()
+    # Rename columns to match nba_api dataframe columns
+    br_df.rename(columns={
+        "name": "player_name",
+        "team": "team_mascot",
+        "positions": "position"
+    }, inplace=True)
+
+    return br_df
+
+
+def pull_all_players_data() -> pd.DataFrame:
+    """Use nba_api.playergamelogs to return player data using the all teams in the current season."""
+    game_log = playergamelogs.PlayerGameLogs(season_nullable="2023-24",
+                                             ).get_data_frames()[0]
+    game_log.columns = map(str.lower, game_log.columns)
+    game_log["team_mascot"] = game_log["team_name"].str.split(" ").apply(lambda x: x[-1]).str.lower()
+    game_log["opponent_team_abbreviation"] = game_log["matchup"].str.split(" ").apply(lambda x: x[2])
+
+    # time.sleep(1)
+    return game_log
+
+
+def pull_team_defense_data() -> pd.DataFrame:
+    """Use nba_api to find the current defensive rating dataframe for each team. Columns renamed to 'opponent_...'
+     since this will be used to z-scores."""
+    # Request live team defensive ratings
+    team_log = leaguedashteamstats.LeagueDashTeamStats(
+        measure_type_detailed_defense="Defense",
+        season="2023-24"
+    ).get_data_frames()[0]
+    team_log.columns = map(str.lower, team_log.columns)
+    team_log.rename(columns={"def_rating_rank": "defense_rank",
+                             "def_rating": "defense_rating"}, inplace=True)
+    defense_log = team_log[["team_id", "defense_rating", "defense_rank"]]
+    # Pull static teams dataframe for IDs and abbreviations
+    team_details = pd.DataFrame(teams.get_teams()).rename(
+        columns={"id": "team_id", "abbreviation": "team_abbreviation"})
+    defense_log = pd.merge(left=defense_log, right=team_details[["team_id", "team_abbreviation"]], on="team_id")
+    defense_log.drop(labels=["team_id"], axis=1, inplace=True)
+    # Rename columns because this will be used for player z-score data
+    defense_log.columns = ["opponent_" + x for x in defense_log.columns]
+
+    # time.sleep(1)
+    return defense_log
 
 
 def find_matchup_list(schedule: pd.DataFrame) -> list[MatchUp]:
@@ -132,81 +193,11 @@ def simplify_stats_df_for_z_score(stats_df: pd.DataFrame, stats_to_norm: list[st
     return stats_df
 
 
-def pull_player_positions() -> pd.DataFrame:
-    """Use basketball_reference_web_scraper to find all current players' position on their respective team"""
-    # # Basketball Reference call
-    br_df = pd.DataFrame(client.players_season_totals(season_end_year=2024))
-    br_df = br_df[["name", "positions", "team"]]
-
-    # Convert positions and team columns to str since they are listed as enums
-    br_df["positions"] = br_df["positions"].astype(str)
-    br_df["team"] = br_df["team"].astype(str)
-
-    # Remove accents on names to match stats.nba.com
-    br_df["name"] = br_df["name"].apply(unidecode)
-    # Use the static positions dictionary to convert to a more legible position string
-    br_df["positions"] = br_df["positions"].apply(lambda x: POSITION_DICT.get(x))
-    br_df["team"] = br_df["team"].str.split("_").apply(lambda x: x[-1]).str.lower()
-    # Rename columns to match nba_api dataframe columns
-    br_df.rename(columns={
-        "name": "player_name",
-        "team": "team_mascot",
-        "positions": "position"
-    }, inplace=True)
-
-    return br_df
-
-
-def pull_players_data(team: Team, last_n_games: int, opposing: bool = False) -> pd.DataFrame:
-    """Use nba_api to return player data using the team input. If 'opposing' is set to True, it will find data for all
-    players who played against the given team"""
-    id_against, id_for = None, None
-    if opposing:
-        id_against = team.id
-    else:
-        id_for = team.id
-
-    game_log = playergamelogs.PlayerGameLogs(opp_team_id_nullable=id_against,
-                                             team_id_nullable=id_for,
-                                             last_n_games_nullable=str(last_n_games),
-                                             season_nullable="2023-24",
-                                             ).get_data_frames()[0]
-    game_log.columns = map(str.lower, game_log.columns)
-    game_log["team_mascot"] = game_log["team_name"].str.split(" ").apply(lambda x: x[-1]).str.lower()
-
-    # time.sleep(1)
-    return game_log
-
-
-def pull_team_defense_data() -> pd.DataFrame:
-    """Use nba_api to find the current defensive rating dataframe for each team. Columns renamed to 'opponent_...'
-     since this will be used to z-scores."""
-    # Request live team defensive ratings
-    team_log = leaguedashteamstats.LeagueDashTeamStats(
-        measure_type_detailed_defense="Defense",
-        season="2023-24"
-    ).get_data_frames()[0]
-    team_log.columns = map(str.lower, team_log.columns)
-    team_log.rename(columns={"def_rating_rank": "defense_rank",
-                             "def_rating": "defense_rating"}, inplace=True)
-    defense_log = team_log[["team_id", "defense_rating", "defense_rank"]]
-    # Pull static teams dataframe for IDs and abbreviations
-    team_details = pd.DataFrame(teams.get_teams()).rename(
-        columns={"id": "team_id", "abbreviation": "team_abbreviation"})
-    defense_log = pd.merge(left=defense_log, right=team_details[["team_id", "team_abbreviation"]], on="team_id")
-    defense_log.drop(labels=["team_id"], axis=1, inplace=True)
-    # Rename columns because this will be used for player z-score data
-    defense_log.columns = ["opponent_" + x for x in defense_log.columns]
-
-    # time.sleep(1)
-    return defense_log
-
-
-def organize_opp_position_stats(team_logs_df: pd.DataFrame, position_df: pd.DataFrame) -> pd.DataFrame:
+def organize_opp_position_stats(player_df: pd.DataFrame, position_df: pd.DataFrame) -> pd.DataFrame:
     """Use a team's game log dataframe and the static positions dataframe to merge each player's position to their
      row. Return a dataframe that is grouped by player position and averaged."""
     df = pd.merge(
-        left=team_logs_df,
+        left=player_df,
         right=position_df,
         on=["player_name", "team_mascot"],
         how="left"
@@ -333,11 +324,13 @@ def find_player_z_score_avg_stats(
     return player_avg_df
 
 
-def analyze_opp_position_stats(team: Team, positions: pd.DataFrame, match_i: int, last_n_games: int) -> pd.DataFrame:
+def analyze_opp_position_stats(match_i: int, team: Team, positions: pd.DataFrame, player_data: pd.DataFrame)\
+        -> pd.DataFrame:
     """Organizer function to find which position plays best against the given team. Returns dataframe that will be
     concatenated later with each other team that plays today."""
-    team_logs = pull_players_data(team=team, last_n_games=last_n_games, opposing=True)
-    position_stats = organize_opp_position_stats(team_logs_df=team_logs, position_df=positions)
+    # Slice DataFrame to only players against the supplied team
+    player_data_vs_team = player_data[player_data["opponent_team_abbreviation"] == team.abbr].copy()
+    position_stats = organize_opp_position_stats(player_df=player_data_vs_team, position_df=positions)
     # team_logs.to_json(f"{team.abbr}_opp_player_logs.json")
     team_results = find_opp_max_stats(position_stats)
 
@@ -349,11 +342,12 @@ def analyze_opp_position_stats(team: Team, positions: pd.DataFrame, match_i: int
     return opp_position_df
 
 
-def analyze_for_player_stats(team: Team, match_i: int, last_n_games: int = 70) -> pd.DataFrame:
+def analyze_for_player_stats(team: Team, match_i: int, player_data: pd.DataFrame) -> pd.DataFrame:
     """Organizer function to find which player has the best stats for the given team. Returns dataframe that will be
     concatenated later with each other team that plays today."""
-    player_data = pull_players_data(team=team, last_n_games=last_n_games, opposing=False)
-    position_stats = organize_for_player_stats(player_data)
+    # Slice DataFrame to only players for the supplied team
+    player_data_for_team = player_data[player_data["team_abbreviation"] == team.abbr].copy()
+    position_stats = organize_for_player_stats(player_data_for_team)
     team_results = find_for_player_max_stats(position_stats)
 
     team_results = {(match_i, team.abbr): team_results}
@@ -365,22 +359,23 @@ def analyze_for_player_stats(team: Team, match_i: int, last_n_games: int = 70) -
     return for_team_df
 
 
-def analyze_player_z_scores(team: Team, match_i: int) -> pd.DataFrame:
+def analyze_player_z_scores(team: Team, match_i: int, player_data: pd.DataFrame) -> pd.DataFrame:
     """Organizer function to find each player's 'normalized' statistics based on opponent statistics. Returns dataframe
      that will be concatenated later with each other team that plays today."""
+    # Slice DataFrame to only players for the supplied team
+    player_data_for_team = player_data[player_data["team_abbreviation"] == team.abbr].copy()
     # Declare which opponent stats will be used in calculating z-scores
     z_score_list = ["opponent_defense_rating", "opponent_defense_rank"]
     # Declare which player stats will be normalized
     stat_norm_list = ["pts", "fg3_pct", "fg3a", "ast", "reb"]
-    player_data = pull_players_data(team=team, last_n_games=200, opposing=False)
     # player_data.to_json(f"{team.abbr}_player_stats.json")
-    player_data = simplify_stats_df_for_z_score(stats_df=player_data, stats_to_norm=stat_norm_list)
+    player_data_for_team = simplify_stats_df_for_z_score(stats_df=player_data_for_team, stats_to_norm=stat_norm_list)
 
     team_defense_data = pull_team_defense_data()
 
     # team_defense_data.to_json(f"team_def_ratings.json")
 
-    z_score_df = organize_z_score_stats(players_log=player_data, team_log=team_defense_data,
+    z_score_df = organize_z_score_stats(players_log=player_data_for_team, team_log=team_defense_data,
                                         z_score_list=z_score_list, stat_norm_list=stat_norm_list)
     z_score_df = find_player_z_score_avg_stats(z_score_df=z_score_df,
                                                z_score_list=z_score_list, stat_norm_list=stat_norm_list)
@@ -399,10 +394,16 @@ def analyze_player_z_scores(team: Team, match_i: int) -> pd.DataFrame:
     return z_score_df
 
 
-def loop_matchups(matchups: list[MatchUp], positions_df: pd.DataFrame) -> list[StatDF]:
+def loop_matchups(matchups: list[MatchUp]) -> list[StatDF]:
     """Loop through each team in the list of today's match-ups to find the requested stats. Return a list containing a
     dataframe for each stat type. Currently, analyzes: Best position stats against each team's defense, Best player
     for each team, Each player's normalized statistic based on opponent defense z-score."""
+
+    # Pull all necessary DataFrames
+    player_df = pull_all_players_data()
+    positions_df = pull_player_positions()
+    # positions_df.to_json("player_positions.json")
+
     opp_position_final_df = pd.DataFrame()
     for_team_final_df = pd.DataFrame()
     z_score_final_df = pd.DataFrame()
@@ -413,24 +414,25 @@ def loop_matchups(matchups: list[MatchUp], positions_df: pd.DataFrame) -> list[S
 
             # # Find the best opposing position against this team
             opp_position_df = analyze_opp_position_stats(
+                match_i=i,
                 team=team,
                 positions=positions_df,
-                match_i=i,
-                last_n_games=70
+                player_data=player_df,
             )
             opp_position_final_df = pd.concat(objs=[opp_position_final_df, opp_position_df])
             # # Find the best stats shooter for this team
             for_team_df = analyze_for_player_stats(
                 team=team,
                 match_i=i,
-                last_n_games=70
+                player_data=player_df
             )
             for_team_final_df = pd.concat(objs=[for_team_final_df, for_team_df])
 
             # # Find each player's z-score normalized stats
             z_score_df = analyze_player_z_scores(
                 team=team,
-                match_i=i
+                match_i=i,
+                player_data=player_df,
             )
             z_score_final_df = pd.concat(objs=[z_score_final_df, z_score_df])
 
@@ -451,12 +453,8 @@ def analyze_games(schedule_df: pd.DataFrame) -> list[str]:
     matchups_list = find_matchup_list(schedule_df)
     # pd.DataFrame(matchups_list).to_json("Data/data_20240404/schedule.json")
 
-    # Find df of player name/team/position
-    positions_df = pull_player_positions()
-    # positions_df.to_json("player_positions.json")
-
     # Pull data for each team and organize
-    df_list = loop_matchups(matchups=matchups_list, positions_df=positions_df)
+    df_list = loop_matchups(matchups=matchups_list)
     save_dfs_to_csv(df_list)
     html_list = format_dfs_to_html(df_list)
     return html_list
@@ -471,7 +469,7 @@ def prep_dfs_for_html(stat_dfs: list[StatDF]) -> list[StatDF]:
 
         # Set HTML highlighting at the beginning and end of numbers where the normalized stat is "percent_diff" larger
         # than the original stat
-        percent_diff = 0.2
+        percent_diff = 0.25
         for col in stat_df.df.columns:
             if not col.startswith("normalized"):
                 continue
