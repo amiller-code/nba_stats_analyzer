@@ -28,6 +28,8 @@ class AutomatedEmail:
                 self.message.attach(part)
 
     def send_email(self):
+        self.attach_html()
+        self.attach_csv()
         with smtplib.SMTP("smtp.gmail.com") as connection:
             connection.starttls()
             connection.login(user=SENDER, password=PASSWORD)

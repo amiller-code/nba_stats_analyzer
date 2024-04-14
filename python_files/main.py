@@ -21,8 +21,8 @@ POSITION_DICT = {
     "[<Position.POINT_GUARD: 'POINT GUARD'>]": "PG",
     "[<Position.SMALL_FORWARD: 'SMALL FORWARD'>]": "SF",
 }
-RECIPIENTS = [json.loads(os.environ.get("RECIPIENT_EMAILS"))[0]]    # Send to ONLY ME
-# RECIPIENTS = json.loads(os.environ.get("RECIPIENT_EMAILS"))         # Send to FULL LIST
+# RECIPIENTS = [json.loads(os.environ.get("RECIPIENT_EMAILS"))[0]]    # Send to ONLY ME
+RECIPIENTS = json.loads(os.environ.get("RECIPIENT_EMAILS"))         # Send to FULL LIST
 
 pd.set_option('display.max_columns', None)
 pd.set_option("display.width", 225)
