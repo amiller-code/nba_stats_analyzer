@@ -21,8 +21,8 @@ POSITION_DICT = {
     "[<Position.POINT_GUARD: 'POINT GUARD'>]": "PG",
     "[<Position.SMALL_FORWARD: 'SMALL FORWARD'>]": "SF",
 }
-# RECIPIENTS = [json.loads(os.environ.get("RECIPIENT_EMAILS"))[0]]    # Send to ONLY ME
-RECIPIENTS = json.loads(os.environ.get("RECIPIENT_EMAILS"))         # Send to FULL LIST
+RECIPIENTS = [json.loads(os.environ.get("RECIPIENT_EMAILS"))[0]]    # Send to ONLY ME
+# RECIPIENTS = json.loads(os.environ.get("RECIPIENT_EMAILS"))         # Send to FULL LIST
 
 pd.set_option('display.max_columns', None)
 pd.set_option("display.width", 225)
@@ -446,7 +446,7 @@ def loop_matchups(matchups: list[MatchUp]) -> list[StatDF]:
     return [opp_position_stat_df, for_team_stat_df, z_score_stat_df]
 
 
-def analyze_games(schedule_df: pd.DataFrame) -> list[str]:
+def initiate_game_analysis(schedule_df: pd.DataFrame) -> list[str]:
     """Primary function for organizing the analysis. Function requires a dataframe with the list of games/teams for
     today. It will convert them to MatchUps, loop through them, extract the needed data, and convert the resultant
     DataFrames to HTML strings and CSVs."""
@@ -504,8 +504,7 @@ def format_dfs_to_html(stat_dfs: list[StatDF]):
 def save_dfs_to_csv(stat_dfs: list[StatDF]) -> None:
     # Check if temp folder exists and create it if not
     if not os.path.exists("../temp"):
-        os.makedirs("../temp"
-                    )
+        os.makedirs("../temp")
     # Clear out the temp folder prior to saving
     for file in os.scandir("../temp"):
         os.remove(file.path)
@@ -525,15 +524,18 @@ def create_email_fields(html_list: list[str]) -> None:
 
 
 if __name__ == "__main__":
+    # Initialize email instance
+    email = AutomatedEmail()
+
     # Find schedule and convert to team IDs
     games_df = pull_schedule()
     if games_df.shape[0] > 0:  # If there is at least one game today, run the analyzer
-        stats_html_list = analyze_games(games_df)
+        stats_html_list = initiate_game_analysis(games_df)
+        email.attach_csv()  # Only attach CSVs if there are games today
     else:  # If there are no games today, let the recipients know in the email
-        save_dfs_to_csv(stat_dfs=[])
         stats_html_list = ["No NBA Games Today."]
 
-    # Send email
-    email = AutomatedEmail()
+    # Attach html list and send email
     create_email_fields(stats_html_list)
+    email.attach_html()
     email.send_email()
