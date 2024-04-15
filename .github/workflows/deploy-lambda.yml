@@ -48,7 +48,7 @@ jobs:
                 # Create the directory structure in lambda_env for the modified file
                 mkdir -p lambda_env/$dirname
                 # Copy the modified file
-                cp $file lambda_env/$dirname/$file
+                cp $dirname/$file lambda_env/$dirname/$file
                 # Print what you've done with the file
                 echo "Copied $file to lambda_env/$file"
                 echo "Content of $file after copying:"
