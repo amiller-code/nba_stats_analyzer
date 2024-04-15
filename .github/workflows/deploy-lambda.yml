@@ -44,12 +44,12 @@ jobs:
         # Copy only the modified .py files from the commit into the unzipped directory
         # This will maintain their directory structure.
         for file in $(git ls-tree --name-only -r HEAD:python_files); do
-          echo "$file $dirname"
+        echo "python_files/$file"
             if [[ ( $file == *.py ) || ( $file == *.txt ) ]]; then
                 # Create the directory structure in lambda_env for the modified file
-                mkdir -p lambda_env/$dirname
+                mkdir -p lambda_env/python_files/
                 # Copy the modified file
-                cp $file lambda_env/$dirname/$file
+                cp python_files/$file lambda_env/python_files/$file
                 # Print what you've done with the file
                 echo "Copied $file to lambda_env/$file"
                 echo "Content of $file after copying:"
