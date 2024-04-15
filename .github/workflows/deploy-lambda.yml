@@ -43,7 +43,7 @@ jobs:
         unzip existing_lambda.zip -d lambda_env
         # Copy only the modified .py files from the commit into the unzipped directory
         # This will maintain their directory structure.
-        for file in $(git ls-tree --name-only -r HEAD ':(glob)python_files/*'); do
+        for file in $(git ls-tree --name-only -r HEAD:python_files); do
             if [[ ( $file == *.py ) || ( $file == *.txt ) ]]; then
                 # Create the directory structure in lambda_env for the modified file
                 mkdir -p lambda_env/$(dirname $file)
