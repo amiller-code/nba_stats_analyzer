@@ -20,8 +20,8 @@ POSITION_DICT = {
     "[<Position.POINT_GUARD: 'POINT GUARD'>]": "PG",
     "[<Position.SMALL_FORWARD: 'SMALL FORWARD'>]": "SF",
 }
-# RECIPIENTS = [json.loads(os.environ.get("RECIPIENT_EMAILS"))[0]]    # Send to ONLY ME
-RECIPIENTS = json.loads(os.environ.get("RECIPIENT_EMAILS"))         # Send to FULL LIST
+RECIPIENTS = [json.loads(os.environ.get("RECIPIENT_EMAILS"))[0]]    # Send to ONLY ME
+# RECIPIENTS = json.loads(os.environ.get("RECIPIENT_EMAILS"))  # Send to FULL LIST
 
 pd.set_option('display.max_columns', None)
 pd.set_option("display.width", 225)
@@ -323,7 +323,7 @@ def find_player_z_score_avg_stats(
     return player_avg_df
 
 
-def analyze_opp_position_stats(match_i: int, team: Team, positions: pd.DataFrame, player_data: pd.DataFrame)\
+def analyze_opp_position_stats(match_i: int, team: Team, positions: pd.DataFrame, player_data: pd.DataFrame) \
         -> pd.DataFrame:
     """Organizer function to find which position plays best against the given team. Returns dataframe that will be
     concatenated later with each other team that plays today."""
@@ -513,7 +513,7 @@ def save_dfs_to_csv(stat_dfs: list[StatDF]) -> None:
         stat_df.df.to_csv(f"temp/{csv_name}.csv")
 
 
-def create_email_fields(html_list: list[str]) -> None:
+def create_email_fields(email: AutomatedEmail, html_list: list[str]) -> None:
     """Fill in field for the global email variable and attach csv files"""
     today = datetime.today().strftime("%m-%d-%Y")
 
@@ -522,7 +522,7 @@ def create_email_fields(html_list: list[str]) -> None:
     email.html_str = "<br>".join(html_list)
 
 
-if __name__ == "__main__":
+def lambda_handler(event=None, context=None):
     # Initialize email instance
     email = AutomatedEmail()
 
@@ -535,6 +535,10 @@ if __name__ == "__main__":
         stats_html_list = ["No NBA Games Today."]
 
     # Attach html list and send email
-    create_email_fields(stats_html_list)
+    create_email_fields(email, stats_html_list)
     email.attach_html()
     email.send_email()
+
+
+if __name__ == "__main__":
+    lambda_handler()
