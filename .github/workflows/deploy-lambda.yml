@@ -33,9 +33,9 @@ jobs:
     - name: Deploy Modified Files
       run: |
         # Constants
-        S3_BUCKET=<nba-stats-amiller>
-        S3_KEY=<Lib.zip>
-        LAMBDA_FUNCTION_NAME=<nba_stats>
+        S3_BUCKET=nba-stats-amiller
+        S3_KEY=Lib.zip
+        LAMBDA_FUNCTION_NAME=nba-stats
         # Download the existing zip from S3
         aws s3 cp s3://$S3_BUCKET/$S3_KEY existing_lambda.zip
         # Unzip the existing package
