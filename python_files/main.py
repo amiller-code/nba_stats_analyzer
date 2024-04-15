@@ -533,7 +533,7 @@ if __name__ == "__main__":
         stats_html_list = initiate_game_analysis(games_df)
         email.attach_csv()  # Only attach CSVs if there are games today
     else:  # If there are no games today, let the recipients know in the email
-        stats_html_list = ["No NBA Games Today."]
+        stats_html_list = ["No NBA Games Today. (AWS)"]
 
     # Attach html list and send email
     create_email_fields(stats_html_list)
