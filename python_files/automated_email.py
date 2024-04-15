@@ -12,7 +12,6 @@ PASSWORD = os.environ.get("EMAIL_PASSWORD")
 class AutomatedEmail:
     def __init__(self):
         self.message = MIMEMultipart("alternative")
-        # self.message["From"] = SENDER
         self.html_str = ""
 
     def attach_html(self):
