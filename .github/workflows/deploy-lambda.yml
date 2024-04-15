@@ -3,7 +3,7 @@ name: Deploy Python Lambda
 on:
   push:
     branches:
-      - main
+      - master
     paths:
       - '**.py' # Change to the file extension of the language that you are using.
 
