@@ -3,7 +3,6 @@ from automated_email import AutomatedEmail
 import os
 import json
 import requests
-import shutil
 import pandas as pd
 from datetime import datetime
 from dataclasses import dataclass
