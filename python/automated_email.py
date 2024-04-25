@@ -17,7 +17,7 @@ class AutomatedEmail:
     def attach_html(self):
         self.message.attach(MIMEText(self.html_str, _subtype="html"))
 
-    def attach_csv(self, csv_dir: str = "temp"):
+    def attach_csv(self, csv_dir: str = "../temp"):
         for file in os.scandir(csv_dir):
             with open(file.path, "rb") as attachment:
                 part = MIMEBase("application", "octet-stream")
