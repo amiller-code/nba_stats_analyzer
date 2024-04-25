@@ -23,6 +23,21 @@ POSITION_DICT = {
 # RECIPIENTS = [json.loads(os.environ.get("RECIPIENT_EMAILS"))[0]]    # Send to ONLY ME
 RECIPIENTS = json.loads(os.environ.get("RECIPIENT_EMAILS"))  # Send to FULL LIST
 
+NBA_API_HEADERS = {
+    'Host': 'stats.nba.com',
+    'Connection': 'keep-alive',
+    'Accept': 'application/json, text/plain, */*',
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+    'Origin': 'https://www.nba.com',
+    'Referer': 'https://www.nba.com/',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Accept-Language': 'en-US,en;q=0.5',
+    'Sec-Fetch-Dest': 'empty',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Site': 'same-site',
+    'Sec-GPC': '1'
+}
+
 pd.set_option('display.max_columns', None)
 pd.set_option("display.width", 225)
 pd.options.mode.chained_assignment = None
@@ -84,8 +99,10 @@ def pull_player_positions() -> pd.DataFrame:
 
 def pull_all_players_data() -> pd.DataFrame:
     """Use nba_api.playergamelogs to return player data using the all teams in the current season."""
-    game_log = playergamelogs.PlayerGameLogs(season_nullable="2023-24",
-                                             ).get_data_frames()[0]
+    game_log = playergamelogs.PlayerGameLogs(
+        season_nullable="2023-24",
+        headers=NBA_API_HEADERS,
+    ).get_data_frames()[0]
     game_log.columns = map(str.lower, game_log.columns)
     game_log["team_mascot"] = game_log["team_name"].str.split(" ").apply(lambda x: x[-1]).str.lower()
     game_log["opponent_team_abbreviation"] = game_log["matchup"].str.split(" ").apply(lambda x: x[2])
@@ -100,7 +117,8 @@ def pull_team_defense_data() -> pd.DataFrame:
     # Request live team defensive ratings
     team_log = leaguedashteamstats.LeagueDashTeamStats(
         measure_type_detailed_defense="Defense",
-        season="2023-24"
+        season="2023-24",
+        headers=NBA_API_HEADERS
     ).get_data_frames()[0]
     team_log.columns = map(str.lower, team_log.columns)
     team_log.rename(columns={"def_rating_rank": "defense_rank",
