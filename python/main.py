@@ -528,7 +528,7 @@ def save_dfs_to_csv(stat_dfs: list[StatDF]) -> None:
 
     for stat_df in stat_dfs:
         csv_name = stat_df.header.lower().replace(" ", "_")
-        stat_df.df.to_csv(f"temp/{csv_name}.csv")
+        stat_df.df.to_csv(f"../temp/{csv_name}.csv")
 
 
 def create_email_fields(email: AutomatedEmail, html_list: list[str]) -> None:
