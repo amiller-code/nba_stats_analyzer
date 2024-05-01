@@ -38,6 +38,10 @@ NBA_API_HEADERS = {
     'Sec-GPC': '1'
 }
 
+CURR_DIR = os.path.realpath(os.path.dirname(__file__)).replace("\\", "/")
+PARENT_DIR = "/".join(CURR_DIR.split("/")[:-1])
+TEMP_DIR = PARENT_DIR + "/temp"
+
 pd.set_option('display.max_columns', None)
 pd.set_option("display.width", 225)
 pd.options.mode.chained_assignment = None
@@ -519,16 +523,17 @@ def format_dfs_to_html(stat_dfs: list[StatDF]):
 
 
 def save_dfs_to_csv(stat_dfs: list[StatDF]) -> None:
+
     # Check if temp folder exists and create it if not
-    if not os.path.exists("../temp"):
-        os.makedirs("../temp")
+    if not os.path.exists(TEMP_DIR):
+        os.makedirs(TEMP_DIR)
     # Clear out the temp folder prior to saving
-    for file in os.scandir("../temp"):
+    for file in os.scandir(TEMP_DIR):
         os.remove(file.path)
 
     for stat_df in stat_dfs:
         csv_name = stat_df.header.lower().replace(" ", "_")
-        stat_df.df.to_csv(f"../temp/{csv_name}.csv")
+        stat_df.df.to_csv(f"{TEMP_DIR}/{csv_name}.csv")
 
 
 def create_email_fields(email: AutomatedEmail, html_list: list[str]) -> None:
@@ -548,7 +553,7 @@ def lambda_handler(event=None, context=None):
     games_df = pull_schedule()
     if games_df.shape[0] > 0:  # If there is at least one game today, run the analyzer
         stats_html_list = initiate_game_analysis(games_df)
-        email.attach_csv()  # Only attach CSVs if there are games today
+        email.attach_csv(csv_dir=TEMP_DIR)  # Only attach CSVs if there are games today
     else:  # If there are no games today, let the recipients know in the email
         stats_html_list = ["No NBA Games Today."]
 
