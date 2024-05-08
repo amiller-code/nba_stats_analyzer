@@ -17,7 +17,7 @@ class AutomatedEmail:
     def attach_html(self):
         self.message.attach(MIMEText(self.html_str, _subtype="html"))
 
-    def attach_csv(self, csv_dir: str = "../temp"):
+    def attach_csv(self, csv_dir: str):
         for file in os.scandir(csv_dir):
             with open(file.path, "rb") as attachment:
                 part = MIMEBase("application", "octet-stream")
@@ -27,8 +27,6 @@ class AutomatedEmail:
                 self.message.attach(part)
 
     def send_email(self):
-        self.attach_html()
-        self.attach_csv()
         with smtplib.SMTP(host="smtp.gmail.com", port=587, timeout=10) as connection:
             connection.starttls()
             connection.login(user=SENDER, password=PASSWORD)

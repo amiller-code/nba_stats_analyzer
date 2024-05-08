@@ -554,8 +554,9 @@ def lambda_handler(event=None, context=None):
     if games_df.shape[0] > 0:  # If there is at least one game today, run the analyzer
         stats_html_list = initiate_game_analysis(games_df)
         email.attach_csv(csv_dir=TEMP_DIR)  # Only attach CSVs if there are games today
-    else:  # If there are no games today, let the recipients know in the email
-        stats_html_list = ["No NBA Games Today."]
+    else:  # If there are no games today, do nothing (used to let the recipients know in the email)
+        # stats_html_list = ["No NBA Games Today."]
+        return
 
     # Attach html list and send email
     create_email_fields(email, stats_html_list)
